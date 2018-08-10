@@ -1,5 +1,6 @@
 import math
 import tensorflow as tf
+import keras.backend as KB
 from keras.models import Model
 from keras.engine.topology import Input
 from keras.layers.core import Flatten, Dense, Reshape, Dropout, Activation
@@ -12,7 +13,7 @@ from keras.optimizers import Adam
 from keras.utils import multi_gpu_model, plot_model
 from keras.losses import binary_crossentropy
 
-from dice_coefficient import dice_coef_loss
+from dice_coefficient import dice_coef
 
 
 class UNetPP(object):
@@ -29,21 +30,21 @@ class UNetPP(object):
         for k, filters in enumerate(filters_list):
             layer = self.__add_encode_layers(filters, layer, is_first=(k==0))
             encode_layers.append(layer)
-            concat_layers_list.append(layer)
+            concat_layers_list.append([layer])
 
         add_drop_layer_indexes = [2, 3]
         for base_k, bottom_layer in enumerate(encode_layers[1:]):
-            deconv_item = zip(reversed(filters_list[:(base_k + 1)]), reversed(concat_layers_list[:(base_k + 1)]))
+            deconv_item = zip(reversed(filters_list[:base_k + 1]), reversed(concat_layers_list[:base_k + 1]))
             sub_layer = bottom_layer
             for k, (filters, concat_layers) in enumerate(deconv_item):
                 sub_layer = self.__add_decode_layers(filters, sub_layer, concat_layers
                                                      , add_drop_layer=(k in add_drop_layer_indexes))
-                concat_layers_list[base_k - (k + 1)].append(sub_layer)
+                concat_layers_list[base_k - k].append(sub_layer)
 
         layer = concatenate(concat_layers_list[0][1:])
         outputs = Conv2D(class_num, 1, activation='sigmoid')(layer)
 
-        self.MODEL = Model(inputs=[inputs], outputs=[outputs])
+        self.__model = Model(inputs=[inputs], outputs=[outputs])
 
 
     def __add_encode_layers(self, filter_size, input_layer, is_first=False):
@@ -56,23 +57,24 @@ class UNetPP(object):
         layer = BatchNormalization()(layer)
         layer = Activation(activation='relu')(layer)
 
-        #layer = Conv2D(filter_size, 3, padding='same')(layer)
-        #layer = BatchNormalization()(layer)
-        #layer = Activation(activation='relu')(layer)
+        layer = Conv2D(filter_size, 3, padding='same')(layer)
+        layer = BatchNormalization()(layer)
+        layer = Activation(activation='relu')(layer)
         return layer
 
 
     def __add_decode_layers(self, filter_size, input_layer, concat_layers, add_drop_layer=False):
         layer = UpSampling2D(2)(input_layer)
-        layer = concatenate(concat_layers.insert(0, layer))
+        concat_layers.insert(0, layer)
+        layer = concatenate(concat_layers)
 
         layer = Conv2D(filter_size, 3, padding='same')(layer)
         layer = BatchNormalization()(layer)
         layer = Activation(activation='relu')(layer)
 
-        #layer = Conv2D(filter_size, 3, padding='same')(layer)
-        #layer = BatchNormalization()(layer)
-        #layer = Activation(activation='relu')(layer)
+        layer = Conv2D(filter_size, 3, padding='same')(layer)
+        layer = BatchNormalization()(layer)
+        layer = Activation(activation='relu')(layer)
 
         if add_drop_layer:
             layer = Dropout(0.5)(layer)
@@ -84,9 +86,12 @@ class UNetPP(object):
 
 
     def __losses(self, y_true, y_pred):
-        binx_loss = binary_crossentropy(y_true, y_pred)
-        dice_loss = dice_coef_loss(y_true, y_pred)
-        return tf.reduce_sum(tf.stack([binx_loss, dice_loss]))
+        # TODO unstack by batch ?
+        true_flat = KB.flatten(y_true)
+        pred_flat = KB.flatten(y_pred)
+        binx_loss = KB.sum(true_flat * KB.log(pred_flat) / 2)
+        dice_loss = dice_coef(y_true, y_pred)
+        return -1 * (tf.reduce_sum(tf.stack([binx_loss, dice_loss])) / KB.cast(KB.shape(y_true)[0], 'float32'))
 
 
     def get_model(self, with_comple=False):
