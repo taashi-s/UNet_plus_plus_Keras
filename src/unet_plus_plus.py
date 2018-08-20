@@ -87,11 +87,21 @@ class UNetPP(object):
 
     def __losses(self, y_true, y_pred):
         # TODO unstack by batch ?
-        true_flat = KB.flatten(y_true)
-        pred_flat = KB.flatten(y_pred)
-        binx_loss = KB.sum(true_flat * KB.log(pred_flat) / 2)
+        binx_loss = self.__binary_cross_entropy(y_true, y_pred)
         dice_loss = dice_coef(y_true, y_pred)
         return -1 * (tf.reduce_sum(tf.stack([binx_loss, dice_loss])) / KB.cast(KB.shape(y_true)[0], 'float32'))
+
+
+    def __binary_cross_entropy(self, y_true, y_pred):
+        true_flat = KB.flatten(y_true)
+        pred_flat = KB.flatten(y_pred)
+        pred_logs = KB.log(pred_flat)
+        not_nan_ids = tf.where(tf.equal(tf.is_nan(pred_logs), False))
+
+        not_nan_true_f = KB.gather(true_flat, not_nan_ids)
+        not_nan_pred_logs_f = KB.gather(pred_logs, not_nan_ids)
+        return KB.sum(not_nan_true_f * not_nan_pred_logs_f / 2)
+
 
 
     def get_model(self, with_comple=False):

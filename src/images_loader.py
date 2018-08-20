@@ -20,11 +20,6 @@ def load_images(dir_name, image_shape, with_normalize=True):
 
 
 def load_image(file_name, image_shape, with_normalize=True):
-    #src_img = Image.open(file)
-    #dist_img = src_img.convert('L')
-    #img_array = np.asarray(dist_img)
-    #img_array = np.reshape(img_array, image_shape)
-    #images.append(img_array / 255)
     src_img = cv2.imread(file_name)
     if src_img is None:
         return None
@@ -41,11 +36,6 @@ def load_image(file_name, image_shape, with_normalize=True):
 def save_images(dir_name, image_data_list, file_name_list):
     for _, (image_data, file_name) in enumerate(zip(image_data_list, file_name_list)):
         name = os.path.basename(file_name)
-        #(w, h, _) = image_data.shape
-        #image_data = np.reshape(image_data, (w, h))
-        #distImg = Image.fromarray(image_data * 255)
-        #distImg = distImg.convert('RGB')
         save_path = os.path.join(dir_name, name)
-        #distImg.save(save_path, "png")
-        cv2.imwrite(image_data * 255, save_path)
+        cv2.imwrite(save_path, image_data * 255)
         print('saved : ' , save_path)

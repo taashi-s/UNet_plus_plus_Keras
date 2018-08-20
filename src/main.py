@@ -11,12 +11,12 @@ from data_generator import DataGenerator
 from history_checkpoint_callback import HistoryCheckpoint
 
 
-CLASS_NUM = 1
+CLASS_NUM = 3
 DEPTH = 4
 INPUT_IMAGE_SHAPE = (256, 256, 3)
-BATCH_SIZE = 20
+BATCH_SIZE = 80
 EPOCHS = 1000
-GPU_NUM = 4
+GPU_NUM = 8
 
 START_FILTER = 32
 
